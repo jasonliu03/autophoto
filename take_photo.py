@@ -11,7 +11,7 @@ face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_alt2.xml')
 eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
 
 #camera = cv2.VideoCapture(0) # 参数0表示第一个摄像头
-camera = cv2.VideoCapture("vedio4.avi") # 参数0表示第一个摄像头
+camera = cv2.VideoCapture("vedio5.avi") # 参数0表示第一个摄像头
 
 # 判断视频是否打开
 if (camera.isOpened()):
@@ -19,14 +19,9 @@ if (camera.isOpened()):
 else:
     print('摄像头未打开')
 
-# 测试用,查看视频size
-#size = (int(camera.get(cv2.CAP_PROP_FRAME_WIDTH)),
-#        int(camera.get(cv2.CAP_PROP_FRAME_HEIGHT)))
-#print('size:'+repr(size))
-
-fps = 5  # 帧率
-pre_frame = None  # 总是取视频流前一帧做为背景相对下一帧进行比较
 i = 0
+faceRect = []
+b_gender_on = True
 rst_gender = -1
 while True:
     start = time.time()
@@ -52,18 +47,78 @@ while True:
     w = int(rst[2])
     h = int(rst[3])
     if x!=0 and y!=0 and w!=0 and h!=0:
-        cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (255, 0, 0), 2)
-        if rst_gender == 0:
-            cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (0, 255, 0), 2)
-            cv2.putText(frame_lwpCV,u'man',(x, y),cv2.FONT_HERSHEY_COMPLEX,1,(255,0,0),1)
-        elif rst_gender == 1:
-            cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (0, 0, 255), 2)
-            cv2.putText(frame_lwpCV,u'woman',(x, y),cv2.FONT_HERSHEY_COMPLEX,1,(0,255,255),1)
-            
-        roi_frame_lwpCV = frame_lwpCV[y:y + h, x:x + w] # 检出人脸区域后，取上半部分，因为眼睛在上边啊，这样精度会高一些
-        faceImg = cv2.resize(roi_frame_lwpCV, (224, 224))
-        cv2.imwrite('tmpGender.jpg', faceImg) # 将检测到的人脸写入文件
+        #cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (255, 0, 0), 2)
+        #if rst_gender == 0:
+        #    cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (0, 255, 0), 2)
+        #    cv2.putText(frame_lwpCV,u'man',(x, y),cv2.FONT_HERSHEY_COMPLEX,1,(255,0,0),1)
+        #elif rst_gender == 1:
+        #    cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (0, 0, 255), 2)
+        #    cv2.putText(frame_lwpCV,u'woman',(x, y),cv2.FONT_HERSHEY_COMPLEX,1,(0,255,255),1)
+        #    
+        #roi_frame_lwpCV = frame_lwpCV[y:y + h, x:x + w] # 检出人脸区域后，取上半部分，因为眼睛在上边啊，这样精度会高一些
+        #faceImg = cv2.resize(roi_frame_lwpCV, (224, 224))
+        #cv2.imwrite('tmpGender.jpg', faceImg) # 将检测到的人脸写入文件
+        minnum = 10
+        maxnum = 5
+        faceRectIndex1 = 0
+        faceRectIndex2 = 49
+        faceDistance = 50
+        absDistance = 20
+        minDistance = 100
+        maxDistance = 325
         
+        cv2.rectangle(frame_lwpCV, (x, y), (x + w, y + h), (255, 0, 0), 2)
+        if w < minDistance or h < minDistance:
+            cv2.putText(frame_lwpCV, 'Closer', (w // 2 + x, y - h // 8), cv2.FONT_HERSHEY_PLAIN, 2.0,
+                        (255, 255, 255), 2, 1)
+            faceRect = []
+        elif maxDistance < w and maxDistance < h:
+            cv2.putText(frame_lwpCV, 'stay away', (w // 2 + x, y - h // 8), cv2.FONT_HERSHEY_PLAIN, 2.0,
+                        (255, 255, 255), 2, 1)
+            faceRect = []
+        elif minDistance+minnum < w < maxDistance+maxnum and minDistance+minnum < h < maxDistance+maxnum:
+            if len(faceRect) == faceDistance:
+                faceRect.pop(0)
+                faceRect.append([x,y,w,h])
+            else:
+                faceRect.append([x,y,w,h])
+            if len(faceRect) == faceDistance:
+                flag = True
+                for r in faceRect:
+                    if not r:
+                        flag = False
+                        pass
+                if not flag:
+                    pass
+                else:
+                    #for (x1, y1, w1, h1) in faceRect[0]:
+                    #    for (x9, y9, w9, h9) in faceRect[9]:
+                            x1 = faceRect[faceRectIndex1][0]
+                            y1 = faceRect[faceRectIndex1][1]
+                            w1 = faceRect[faceRectIndex1][2]
+                            h1 = faceRect[faceRectIndex1][3]
+                            x9 = faceRect[faceRectIndex2][0]
+                            y9 = faceRect[faceRectIndex2][1]
+                            w9 = faceRect[faceRectIndex2][2]
+                            h9 = faceRect[faceRectIndex2][3]
+                            if abs(x1-x9) > absDistance or abs(y1-y9) > absDistance:
+                                pass
+                            elif abs(w1-w9) > absDistance or abs(h1-h9) > absDistance:
+                                pass
+                            else:
+                                cv2.putText(frame_lwpCV, 'Taking photo', (w // 2 + x, y - h // 8), cv2.FONT_HERSHEY_PLAIN, 2.0,
+                                                    (255, 255, 255), 2, 1)
+                                time.sleep(1)
+                                cv2.imshow('lwpCVWindow', frame_lwpCV)
+                                time.sleep(2)
+
+                                #cv2.imwrite(save_path + str(i) + '.jpg', frame_lwpCV[y:y + h, x:x + w])
+                                faceRect = []
+                                pass
+            else:
+                pass
+        else:
+            pass
 
         #roi_frame_lwpCV = frame_lwpCV[y:y + h, x:x + w] # 检出人脸区域后，取上半部分，因为眼睛在上边啊，这样精度会高一些
         #faceImg = cv2.resize(roi_frame_lwpCV, (224, 224))
@@ -72,46 +127,14 @@ while True:
         #data_encode = np.array(img_encode)
         #str_encode = data_encode.tostring()
         
-        if i % 3 == 0:
+        if b_gender_on and i % 3 == 0:
             rst_gender = predictGender('tmpGender.jpg')
             print("rst_gender:", rst_gender)
             
         i += 1
         
-#        for (x, y, w, h) in faces:
-#            cv2.rectangle(frame_lwpCV, (x, y), (x + w, y + h), (255, 0, 0), 2)
-#            roi_gray_lwpCV = gray_lwpCV[y:y + h // 2, x:x + w] # 检出人脸区域后，取上半部分，因为眼睛在上边啊，这样精度会高一些
-#            roi_frame_lwpCV = frame_lwpCV[y:y + h // 2, x:x + w]
-#            #cv2.imwrite(save_path + str(i) + '.jpg', frame_lwpCV[y:y + h, x:x + w]) # 将检测到的人脸写入文件
-#            #i += 1
-#            # eyes = eye_cascade.detectMultiScale(roi_gray_lwpCV, 1.03, 5) # 在人脸区域继续检测眼睛
-#            #time.sleep(0.2)
-#        #     for (ex, ey, ew, eh) in eyes:
-#        #         cv2.rectangle(roi_frame_lwpCV, (ex, ey), (ex + ew, ey + eh), (0, 255, 0), 2)
     cv2.imshow('lwpCVWindow', frame_lwpCV)
 
-#    # 运动检测部分
-#    seconds = end - start
-#    if seconds < 1.0 / fps:
-#        time.sleep(1.0 / fps - seconds)
-#    gray_lwpCV = cv2.resize(gray_lwpCV, (500, 500))
-#    # 用高斯滤波进行模糊处理，进行处理的原因：每个输入的视频都会因自然震动、光照变化或者摄像头本身等原因而产生噪声。对噪声进行平滑是为了避免在运动和跟踪时将其检测出来。
-#    gray_lwpCV = cv2.GaussianBlur(gray_lwpCV, (21, 21), 0)
-#    # 在完成对帧的灰度转换和平滑后，就可计算与背景帧的差异，并得到一个差分图（different map）。还需要应用阈值来得到一幅黑白图像，并通过下面代码来膨胀（dilate）图像，从而对孔（hole）和缺陷（imperfection）进行归一化处理
-#    if pre_frame is None:
-#        pre_frame = gray_lwpCV
-#    else:
-#        img_delta = cv2.absdiff(pre_frame, gray_lwpCV)
-#        thresh = cv2.threshold(img_delta, 25, 255, cv2.THRESH_BINARY)[1]
-#        thresh = cv2.dilate(thresh, None, iterations=2)
-#        image, contours, hierarchy = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-#        for c in contours:
-#            if cv2.contourArea(c) < 1000:  # 设置敏感度
-#                continue
-#            else:
-#                print("咦,有什么东西在动0.0")
-#                break
-#        pre_frame = gray_lwpCV
     key = cv2.waitKey(1) & 0xFF
     # 按'q'健退出循环
     if key == ord('q'):
