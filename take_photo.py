@@ -4,6 +4,8 @@ import time
 import pydiagnosis
 import numpy as np
 
+from PIL import Image, ImageDraw, ImageFont
+
 from predict import predictGender
 
 save_path = './face/'
@@ -21,8 +23,18 @@ else:
 
 i = 0
 faceRect = []
-b_gender_on = True
+b_gender_on = False
 rst_gender = -1
+
+def putText(img, text, position, fillColor, font=ImageFont.truetype('NotoSansCJK-Black.ttc', 40)):
+    # 图像从OpenCV格式转换成PIL格式
+    img_PIL = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    
+    draw = ImageDraw.Draw(img_PIL)
+    draw.text(position, text, font=font, fill=fillColor)
+    img = cv2.cvtColor(np.asarray(img_PIL),cv2.COLOR_RGB2BGR)
+    return img
+
 while True:
     start = time.time()
     grabbed, frame_lwpCV = camera.read() # 读取视频流
@@ -39,13 +51,14 @@ while True:
     img_encode = cv2.imencode('.jpg', frame_lwpCV)[1]
     data_encode = np.array(img_encode)
     str_encode = data_encode.tostring()
-    result = pydiagnosis.faceDetect(str_encode)
+    result = pydiagnosis.autoPhoto(str_encode)
     print("result:", result)
     rst = result.strip().split(',')
-    x = int(rst[0])
-    y = int(rst[1])
-    w = int(rst[2])
-    h = int(rst[3])
+    d = int(rst[0])
+    x = int(rst[1])
+    y = int(rst[2])
+    w = int(rst[3])
+    h = int(rst[4])
     if x!=0 and y!=0 and w!=0 and h!=0:
         #cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (255, 0, 0), 2)
         #if rst_gender == 0:
@@ -58,8 +71,6 @@ while True:
         #roi_frame_lwpCV = frame_lwpCV[y:y + h, x:x + w] # 检出人脸区域后，取上半部分，因为眼睛在上边啊，这样精度会高一些
         #faceImg = cv2.resize(roi_frame_lwpCV, (224, 224))
         #cv2.imwrite('tmpGender.jpg', faceImg) # 将检测到的人脸写入文件
-        minnum = 10
-        maxnum = 5
         faceRectIndex1 = 0
         faceRectIndex2 = 49
         faceDistance = 50
@@ -68,15 +79,13 @@ while True:
         maxDistance = 325
         
         cv2.rectangle(frame_lwpCV, (x, y), (x + w, y + h), (255, 0, 0), 2)
-        if w < minDistance or h < minDistance:
-            cv2.putText(frame_lwpCV, 'Closer', (w // 2 + x, y - h // 8), cv2.FONT_HERSHEY_PLAIN, 2.0,
-                        (255, 255, 255), 2, 1)
+        if d == 1:
+            frame_lwpCV = putText(frame_lwpCV, u"请靠近一点", (w // 2 + x, y - h // 8), (0,0,255))
             faceRect = []
-        elif maxDistance < w and maxDistance < h:
-            cv2.putText(frame_lwpCV, 'stay away', (w // 2 + x, y - h // 8), cv2.FONT_HERSHEY_PLAIN, 2.0,
-                        (255, 255, 255), 2, 1)
+        elif d == 2:
+            frame_lwpCV = putText(frame_lwpCV, u"请后退一点", (w // 2 + x, y - h // 8), (0,0,255))
             faceRect = []
-        elif minDistance+minnum < w < maxDistance+maxnum and minDistance+minnum < h < maxDistance+maxnum:
+        else: 
             if len(faceRect) == faceDistance:
                 faceRect.pop(0)
                 faceRect.append([x,y,w,h])
@@ -91,34 +100,26 @@ while True:
                 if not flag:
                     pass
                 else:
-                    #for (x1, y1, w1, h1) in faceRect[0]:
-                    #    for (x9, y9, w9, h9) in faceRect[9]:
-                            x1 = faceRect[faceRectIndex1][0]
-                            y1 = faceRect[faceRectIndex1][1]
-                            w1 = faceRect[faceRectIndex1][2]
-                            h1 = faceRect[faceRectIndex1][3]
-                            x9 = faceRect[faceRectIndex2][0]
-                            y9 = faceRect[faceRectIndex2][1]
-                            w9 = faceRect[faceRectIndex2][2]
-                            h9 = faceRect[faceRectIndex2][3]
-                            if abs(x1-x9) > absDistance or abs(y1-y9) > absDistance:
-                                pass
-                            elif abs(w1-w9) > absDistance or abs(h1-h9) > absDistance:
-                                pass
-                            else:
-                                cv2.putText(frame_lwpCV, 'Taking photo', (w // 2 + x, y - h // 8), cv2.FONT_HERSHEY_PLAIN, 2.0,
-                                                    (255, 255, 255), 2, 1)
-                                time.sleep(1)
-                                cv2.imshow('lwpCVWindow', frame_lwpCV)
-                                time.sleep(2)
+                    x1 = faceRect[faceRectIndex1][0]
+                    y1 = faceRect[faceRectIndex1][1]
+                    w1 = faceRect[faceRectIndex1][2]
+                    h1 = faceRect[faceRectIndex1][3]
+                    x9 = faceRect[faceRectIndex2][0]
+                    y9 = faceRect[faceRectIndex2][1]
+                    w9 = faceRect[faceRectIndex2][2]
+                    h9 = faceRect[faceRectIndex2][3]
+                    if abs(x1-x9) > absDistance or abs(y1-y9) > absDistance:
+                        pass
+                    elif abs(w1-w9) > absDistance or abs(h1-h9) > absDistance:
+                        pass
+                    else:
+                        frame_lwpCV = putText(frame_lwpCV, u"请保持姿态，自动抓拍中...", (0, 0), (255,0,0))
+                        cv2.imshow('lwpCVWindow', frame_lwpCV)
+                        cv2.waitKey(3000)
 
-                                #cv2.imwrite(save_path + str(i) + '.jpg', frame_lwpCV[y:y + h, x:x + w])
-                                faceRect = []
-                                pass
+                        faceRect = []
             else:
                 pass
-        else:
-            pass
 
         #roi_frame_lwpCV = frame_lwpCV[y:y + h, x:x + w] # 检出人脸区域后，取上半部分，因为眼睛在上边啊，这样精度会高一些
         #faceImg = cv2.resize(roi_frame_lwpCV, (224, 224))
@@ -134,7 +135,6 @@ while True:
         i += 1
         
     cv2.imshow('lwpCVWindow', frame_lwpCV)
-
     key = cv2.waitKey(1) & 0xFF
     # 按'q'健退出循环
     if key == ord('q'):
