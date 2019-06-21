@@ -6,14 +6,18 @@ import numpy as np
 
 from PIL import Image, ImageDraw, ImageFont
 
-from predict import predictGender
+import requests
+import json
+
+#from predict import predictGender
 
 save_path = './face/'
-face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_alt2.xml')
+#face_cascade = cv2.CascadeClassifier('haarcascade_frontalface_alt2.xml')
+face_cascade = cv2.CascadeClassifier('haarcascade_tongue.xml')
 eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
 
 #camera = cv2.VideoCapture(0) # 参数0表示第一个摄像头
-camera = cv2.VideoCapture("vedio5.avi") # 参数0表示第一个摄像头
+camera = cv2.VideoCapture("vedio4.avi") # 参数0表示第一个摄像头
 
 # 判断视频是否打开
 if (camera.isOpened()):
@@ -23,7 +27,7 @@ else:
 
 i = 0
 faceRect = []
-b_gender_on = False
+b_gender_on = True
 rst_gender = -1
 
 def putText(img, text, position, fillColor, font=ImageFont.truetype('NotoSansCJK-Black.ttc', 40)):
@@ -36,41 +40,72 @@ def putText(img, text, position, fillColor, font=ImageFont.truetype('NotoSansCJK
     return img
 
 while True:
-    start = time.time()
     grabbed, frame_lwpCV = camera.read() # 读取视频流
+    frame_lwpCV = cv2.resize(frame_lwpCV, (360, 270))
     gray_lwpCV = cv2.cvtColor(frame_lwpCV, cv2.COLOR_BGR2GRAY) # 转灰度图
 
     if not grabbed:
         break
-    end = time.time()
-
+    
     # 人脸检测部分
+    #start = time.time()
     #faces = face_cascade.detectMultiScale(gray_lwpCV, 1.3, 5)
-
+    #end = time.time()
+    #print("origin time:{}".format(end-start))
+    #for face in faces:
+    #    x = face[0]
+    #    y = face[1]
+    #    w= face[2]
+    #    h= face[3]
+    #    cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (255, 0, 0), 2)
+    #    cv2.imshow('lwpCVWindow', frame_lwpCV)
+    #    cv2.waitKey(1)
+    #cv2.imshow('lwpCVWindow', frame_lwpCV)
+    #cv2.waitKey(1)
+    #continue
 
     img_encode = cv2.imencode('.jpg', frame_lwpCV)[1]
     data_encode = np.array(img_encode)
     str_encode = data_encode.tostring()
-    result = pydiagnosis.autoPhoto(str_encode)
+    start = time.time()
+    #result = pydiagnosis.autoPhotoTongue(str_encode)
+    #result = pydiagnosis.glassDetect(str_encode)
+
+    cv2.imwrite('tmp4web.jpg', frame_lwpCV) 
+    photo = './tmp4web.jpg'
+    url = "http://127.0.0.1:5000" + '/api/photos/autoPhoto'
+    files = {'photo': open(photo, 'rb')}
+    res = requests.post(url, files=files)
+    end = time.time()
+    print("algorithm time: {}".format(end-start))
+
+    print("res.text:", res.text)
+    result = {}
+
+    result['status'] = json.loads(res.text).get('status')
+    result['x_point'] = json.loads(res.text).get('x_point')
+    result['y_point'] = json.loads(res.text).get('y_point')
+    result['width'] = json.loads(res.text).get('width')
+    result['height'] = json.loads(res.text).get('height')
     print("result:", result)
-    rst = result.strip().split(',')
-    d = int(rst[0])
-    x = int(rst[1])
-    y = int(rst[2])
-    w = int(rst[3])
-    h = int(rst[4])
-    if x!=0 and y!=0 and w!=0 and h!=0:
-        #cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (255, 0, 0), 2)
-        #if rst_gender == 0:
-        #    cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (0, 255, 0), 2)
-        #    cv2.putText(frame_lwpCV,u'man',(x, y),cv2.FONT_HERSHEY_COMPLEX,1,(255,0,0),1)
-        #elif rst_gender == 1:
-        #    cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (0, 0, 255), 2)
-        #    cv2.putText(frame_lwpCV,u'woman',(x, y),cv2.FONT_HERSHEY_COMPLEX,1,(0,255,255),1)
-        #    
-        #roi_frame_lwpCV = frame_lwpCV[y:y + h, x:x + w] # 检出人脸区域后，取上半部分，因为眼睛在上边啊，这样精度会高一些
-        #faceImg = cv2.resize(roi_frame_lwpCV, (224, 224))
-        #cv2.imwrite('tmpGender.jpg', faceImg) # 将检测到的人脸写入文件
+    d = int(result['status'])
+    x = int(result['x_point'])
+    y = int(result['y_point'])
+    w = int(result['width'])
+    h = int(result['height'])
+    #d = x = y = w = h = 10
+    if x!=0 or y!=0 or w!=0 or h!=0:
+        cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (255, 0, 0), 2)
+        if rst_gender == 0:
+            cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (0, 255, 0), 2)
+            cv2.putText(frame_lwpCV,u'man',(x, y),cv2.FONT_HERSHEY_COMPLEX,1,(255,0,0),1)
+        elif rst_gender == 1:
+            cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (0, 0, 255), 2)
+            cv2.putText(frame_lwpCV,u'woman',(x, y),cv2.FONT_HERSHEY_COMPLEX,1,(0,255,255),1)
+            
+        roi_frame_lwpCV = frame_lwpCV[y:y + h, x:x + w] # 检出人脸区域后，取上半部分，因为眼睛在上边啊，这样精度会高一些
+        faceImg = cv2.resize(roi_frame_lwpCV, (224, 224))
+        cv2.imwrite('tmpGender.jpg', faceImg) # 将检测到的人脸写入文件
         faceRectIndex1 = 0
         faceRectIndex2 = 49
         faceDistance = 50
@@ -115,7 +150,7 @@ while True:
                     else:
                         frame_lwpCV = putText(frame_lwpCV, u"请保持姿态，自动抓拍中...", (0, 0), (255,0,0))
                         cv2.imshow('lwpCVWindow', frame_lwpCV)
-                        cv2.waitKey(3000)
+                        cv2.waitKey(1000)
 
                         faceRect = []
             else:
@@ -129,7 +164,13 @@ while True:
         #str_encode = data_encode.tostring()
         
         if b_gender_on and i % 3 == 0:
-            rst_gender = predictGender('tmpGender.jpg')
+            photo = './tmpGender.jpg'
+            url = "http://127.0.0.1:5000" + '/api/photos/genderDetect'
+            files = {'photo': open(photo, 'rb')}
+            res = requests.post(url, files=files)
+            print("res_gender.text:", res.text)
+            rst_gender = json.loads(res.text).get('status')
+            #rst_gender = predictGender('tmpGender.jpg')
             print("rst_gender:", rst_gender)
             
         i += 1
