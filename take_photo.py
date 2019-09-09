@@ -27,8 +27,12 @@ else:
 
 i = 0
 faceRect = []
-b_gender_on = True
+b_gender_on = False
+b_faceMatch = True
 rst_gender = -1
+rst_faceVerify = -1
+
+IP = "127.0.0.1"
 
 def putText(img, text, position, fillColor, font=ImageFont.truetype('NotoSansCJK-Black.ttc', 40)):
     # 图像从OpenCV格式转换成PIL格式
@@ -73,7 +77,7 @@ while True:
 
     cv2.imwrite('tmp4web.jpg', frame_lwpCV) 
     photo = './tmp4web.jpg'
-    url = "http://127.0.0.1:5000" + '/api/photos/autoPhoto'
+    url = "http://" + IP + ":5000" + '/api/photos/autoPhoto'
     files = {'photo': open(photo, 'rb')}
     res = requests.post(url, files=files)
     end = time.time()
@@ -103,6 +107,9 @@ while True:
             cv2.rectangle(frame_lwpCV, (x, y), (x + w, y +h), (0, 0, 255), 2)
             cv2.putText(frame_lwpCV,u'woman',(x, y),cv2.FONT_HERSHEY_COMPLEX,1,(0,255,255),1)
             
+        if rst_faceVerify != -1:
+            cv2.putText(frame_lwpCV,str(rst_faceVerify),(x, y),cv2.FONT_HERSHEY_COMPLEX,1,(255,0,0),1)
+
         roi_frame_lwpCV = frame_lwpCV[y:y + h, x:x + w] # 检出人脸区域后，取上半部分，因为眼睛在上边啊，这样精度会高一些
         faceImg = cv2.resize(roi_frame_lwpCV, (224, 224))
         cv2.imwrite('tmpGender.jpg', faceImg) # 将检测到的人脸写入文件
@@ -165,13 +172,22 @@ while True:
         
         if b_gender_on and i % 3 == 0:
             photo = './tmpGender.jpg'
-            url = "http://127.0.0.1:5000" + '/api/photos/genderDetect'
+            url = "http://" + IP + ":5000" + '/api/photos/genderDetect'
             files = {'photo': open(photo, 'rb')}
             res = requests.post(url, files=files)
             print("res_gender.text:", res.text)
             rst_gender = json.loads(res.text).get('status')
             #rst_gender = predictGender('tmpGender.jpg')
             print("rst_gender:", rst_gender)
+            
+        if b_faceMatch and i % 3 == 0:
+            photo = './tmpGender.jpg'
+            url = "http://" + IP + ":5000" + '/api/photos/faceVerify'
+            files = {'photo': open(photo, 'rb')}
+            res = requests.post(url, files=files)
+            print("res_faceVerify.text:", res.text)
+            rst_faceVerify = json.loads(res.text).get('status')
+            print("rst_faceVerify:", rst_faceVerify)
             
         i += 1
         
