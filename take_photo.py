@@ -1,13 +1,14 @@
 #!coding=utf-8
 import cv2
 import time
-import pydiagnosis
+#import pydiagnosis
 import numpy as np
 
 from PIL import Image, ImageDraw, ImageFont
 
 import requests
 import json
+from glob import glob
 
 #from predict import predictGender
 
@@ -16,8 +17,10 @@ save_path = './face/'
 face_cascade = cv2.CascadeClassifier('haarcascade_tongue.xml')
 eye_cascade = cv2.CascadeClassifier('haarcascade_eye.xml')
 
-#camera = cv2.VideoCapture(0) # 参数0表示第一个摄像头
-camera = cv2.VideoCapture("vedio4.avi") # 参数0表示第一个摄像头
+camera = cv2.VideoCapture(0) # 参数0表示第一个摄像头
+#camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+#camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+#camera = cv2.VideoCapture("vedio4.avi") # 参数0表示第一个摄像头
 
 # 判断视频是否打开
 if (camera.isOpened()):
@@ -32,14 +35,14 @@ b_faceMatch = True
 rst_gender = -1
 rst_faceVerify = -1
 
-IP = "127.0.0.1"
+IP = "192.168.1.102"
 
-def putText(img, text, position, fillColor, font=ImageFont.truetype('NotoSansCJK-Black.ttc', 40)):
+def putText(img, text, position, fillColor):
     # 图像从OpenCV格式转换成PIL格式
     img_PIL = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
     
     draw = ImageDraw.Draw(img_PIL)
-    draw.text(position, text, font=font, fill=fillColor)
+    draw.text(position, text, fill=fillColor)
     img = cv2.cvtColor(np.asarray(img_PIL),cv2.COLOR_RGB2BGR)
     return img
 
@@ -122,10 +125,10 @@ while True:
         
         cv2.rectangle(frame_lwpCV, (x, y), (x + w, y + h), (255, 0, 0), 2)
         if d == 1:
-            frame_lwpCV = putText(frame_lwpCV, u"请靠近一点", (w // 2 + x, y - h // 8), (0,0,255))
+            frame_lwpCV = putText(frame_lwpCV, u"Closer", (w // 2 + x, y - h // 8), (0,0,255))
             faceRect = []
         elif d == 2:
-            frame_lwpCV = putText(frame_lwpCV, u"请后退一点", (w // 2 + x, y - h // 8), (0,0,255))
+            frame_lwpCV = putText(frame_lwpCV, u"Back OFF", (w // 2 + x, y - h // 8), (0,0,255))
             faceRect = []
         else: 
             if len(faceRect) == faceDistance:
@@ -155,7 +158,7 @@ while True:
                     elif abs(w1-w9) > absDistance or abs(h1-h9) > absDistance:
                         pass
                     else:
-                        frame_lwpCV = putText(frame_lwpCV, u"请保持姿态，自动抓拍中...", (0, 0), (255,0,0))
+                        frame_lwpCV = putText(frame_lwpCV, u"Keep Still, Photoing...", (0, 0), (255,0,0))
                         cv2.imshow('lwpCVWindow', frame_lwpCV)
                         cv2.waitKey(1000)
 
@@ -179,7 +182,8 @@ while True:
             rst_gender = json.loads(res.text).get('status')
             #rst_gender = predictGender('tmpGender.jpg')
             print("rst_gender:", rst_gender)
-            
+
+        # use backend pics    
         if b_faceMatch and i % 3 == 0:
             photo = './tmpGender.jpg'
             url = "http://" + IP + ":5000" + '/api/photos/faceVerify'
@@ -189,6 +193,26 @@ while True:
             rst_faceVerify = json.loads(res.text).get('status')
             print("rst_faceVerify:", rst_faceVerify)
             
+         # use frontend pics
+    #    def takeSecond(elem):
+    #        return elem[1]
+    #    if b_faceMatch and i % 3 == 0:
+    #        imgNames = [e for e in glob('./pics/*')]
+    #        matchList = []
+    #        for index, imgName in enumerate(imgNames):
+    #            photo = './tmpGender.jpg'
+    #            url = "http://" + IP + ":5000" + '/api/photos/faceVerify'
+    #            files = {'photo01': open(photo, 'rb'), 'photo02':open(imgName, 'rb')}
+    #            res = requests.post(url, files=files)
+    #            rst_faceVerify = json.loads(res.text).get('status')
+    #            matchList.append((index, rst_faceVerify, imgName.split('\\')[-1].split('.')[0]))
+    #        if matchList:
+    #            matchList.sort(key=takeSecond)
+    #            threshold = 0.7
+    #            print(matchList)
+    #            if matchList[0][1] < threshold:
+    #                rst_faceVerify = matchList[0][2] + ":" + str(matchList[0][1])
+    #
         i += 1
         
     cv2.imshow('lwpCVWindow', frame_lwpCV)
