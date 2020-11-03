@@ -9,6 +9,8 @@ from PIL import Image, ImageDraw, ImageFont
 import requests
 import json
 from glob import glob
+from concurrent.futures import ThreadPoolExecutor
+import json
 
 #from predict import predictGender
 
@@ -46,9 +48,30 @@ def putText(img, text, position, fillColor):
     img = cv2.cvtColor(np.asarray(img_PIL),cv2.COLOR_RGB2BGR)
     return img
 
+def getEmd(imgName):
+    url = "http://" + IP + ":5000" + '/api/photos/getEmdDirect'
+    f= open(imgName, 'rb')
+    files = {'photo': f}
+    res = requests.post(url, files=files)
+    f.close()
+    rst_emd= json.loads(res.text).get('status')
+    #rst_emd = bytes(rst_emd, encoding='utf-8')
+    emd = json.loads(rst_emd)
+    fw = open(imgName+'.txt', 'w', encoding='utf-8')
+    json.dump(emd, fw)
+    fw.close()
+
+imgNames = [e for e in glob('./pics/*.jpg')]
+matchList = []
+start = time.time()
+for index, imgName in enumerate(imgNames):
+    getEmd(imgName)
+end = time.time()
+print("time_getEmds:", end-start)
+
 while True:
     grabbed, frame_lwpCV = camera.read() # 读取视频流
-    frame_lwpCV = cv2.resize(frame_lwpCV, (360, 270))
+    #frame_lwpCV = cv2.resize(frame_lwpCV, (360, 270))
     gray_lwpCV = cv2.cvtColor(frame_lwpCV, cv2.COLOR_BGR2GRAY) # 转灰度图
 
     if not grabbed:
@@ -184,35 +207,63 @@ while True:
             print("rst_gender:", rst_gender)
 
         # use backend pics    
-        if b_faceMatch and i % 3 == 0:
+    #    if b_faceMatch and i % 5 == 0:
+    #        photo = './tmpGender.jpg'
+    #        url = "http://" + IP + ":5000" + '/api/photos/faceVerify'
+    #        files = {'photo': open(photo, 'rb')}
+    #        res = requests.post(url, files=files)
+    #        print("res_faceVerify.text:", res.text)
+    #        rst_faceVerify = json.loads(res.text).get('status')
+    #        print("rst_faceVerify:", rst_faceVerify)
+    #        
+         # use frontend pics
+        def takeSecond(elem):
+            return elem[1]
+        def doMatch(index, imgName):
             photo = './tmpGender.jpg'
             url = "http://" + IP + ":5000" + '/api/photos/faceVerify'
-            files = {'photo': open(photo, 'rb')}
+            f1 = open(photo, 'rb')
+            f2= open(imgName, 'rb')
+            files = {'photo01': f1, 'photo02':f2}
             res = requests.post(url, files=files)
-            print("res_faceVerify.text:", res.text)
+            f1.close()
+            f2.close()
             rst_faceVerify = json.loads(res.text).get('status')
-            print("rst_faceVerify:", rst_faceVerify)
-            
-         # use frontend pics
-    #    def takeSecond(elem):
-    #        return elem[1]
-    #    if b_faceMatch and i % 3 == 0:
-    #        imgNames = [e for e in glob('./pics/*')]
-    #        matchList = []
-    #        for index, imgName in enumerate(imgNames):
-    #            photo = './tmpGender.jpg'
-    #            url = "http://" + IP + ":5000" + '/api/photos/faceVerify'
-    #            files = {'photo01': open(photo, 'rb'), 'photo02':open(imgName, 'rb')}
-    #            res = requests.post(url, files=files)
-    #            rst_faceVerify = json.loads(res.text).get('status')
-    #            matchList.append((index, rst_faceVerify, imgName.split('\\')[-1].split('.')[0]))
-    #        if matchList:
-    #            matchList.sort(key=takeSecond)
-    #            threshold = 0.7
-    #            print(matchList)
-    #            if matchList[0][1] < threshold:
-    #                rst_faceVerify = matchList[0][2] + ":" + str(matchList[0][1])
-    #
+            matchList.append((index, rst_faceVerify, imgName.split('\\')[-1].split('.')[0]))
+ 
+        def doMatchByEmd(index, imgName):
+            url = "http://" + IP + ":5000" + '/api/photos/faceVerifyEmd'
+            f1 = open('tmpGender.jpg.txt', 'r', encoding='utf-8')
+            f2= open(imgName, 'r', encoding='utf-8')
+            emd1 = json.load(f1)
+            emd2 = json.load(f2)
+            body = {'photo01': emd1, 'photo02':emd2}
+            res = requests.post(url, data=json.dumps(body))
+            f1.close()
+            f2.close()
+            rst_faceVerify = json.loads(res.text).get('status')
+            matchList.append((index, rst_faceVerify, imgName.split('\\')[-1].split('.')[0]))
+
+        if b_faceMatch and i % 5 == 0:
+            imgNames = [e for e in glob('./pics/*.txt')]
+            matchList = []
+            start = time.time()
+            #with ThreadPoolExecutor(3) as executor:
+            #    for index, imgName in enumerate(imgNames):
+            #        executor.submit(doMatch, index, imgName)
+            getEmd('./tmpGender.jpg')
+            for index, imgName in enumerate(imgNames):
+                #doMatch(index, imgName)
+                doMatchByEmd(index, imgName)
+            end = time.time()
+            print("time_match:", end-start)
+            if matchList:
+                matchList.sort(key=takeSecond)
+                print("matchList", matchList)
+                threshold = 1.5
+                if matchList[0][1] < threshold:
+                    rst_faceVerify = matchList[0][2] + ":" + str(matchList[0][1])
+    
         i += 1
         
     cv2.imshow('lwpCVWindow', frame_lwpCV)
